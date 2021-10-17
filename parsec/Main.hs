@@ -2,7 +2,8 @@ import Control.Applicative
 import Data.Char
 import qualified Data.Map.Strict as M
 
-data JsonValue = JsonNull | JsonBool Bool | JsonNum Integer | JsonString String | JsonArray [JsonValue] | JsonObject (M.Map String JsonValue) deriving (Show, Eq)
+-- data JsonValue = JsonNull | JsonBool Bool | JsonNum Integer | JsonString String | JsonArray [JsonValue] | JsonObject (M.Map String JsonValue) deriving (Show, Eq)
+data JsonValue = JsonNull | JsonBool Bool | JsonNum Integer | JsonString String | JsonArray [JsonValue] | JsonObject [(String, JsonValue)] deriving (Show, Eq)
 
 newtype Parser a = Parser {parse :: String -> Maybe (a, String)}
 
@@ -29,7 +30,6 @@ instance Applicative Parser where
     (a, inp'') <- p2 inp'
     Just (f a, inp'')
 
--- :m + Control.Applicative
 instance Alternative Parser where
   empty = Parser $ \_ -> Nothing
   (Parser p1) <|> (Parser p2) = Parser $ \inp ->
@@ -42,7 +42,6 @@ stringParser = traverse charParser
 jsonNull :: Parser JsonValue
 jsonNull = (\_ -> JsonNull) <$> stringParser "null"
 
--- :info Alternative
 jsonBool :: Parser JsonValue
 jsonBool = f <$> (stringParser "true" <|> stringParser "false")
   where
@@ -55,6 +54,9 @@ jsonBool = f <$> (stringParser "true" <|> stringParser "false")
 --   f "false" = JsonBool False
 --   f _       = undefined
 
+-- JSON NUM
+
+notNull :: Foldable t => Parser (t a) -> Parser (t a)
 notNull (Parser p) = Parser $ \inp -> do
   (json, inp') <- p inp
   if null json
@@ -84,32 +86,46 @@ jsonNum = f <$> notNull digitParser
   where
     f x = JsonNum (read x)
 
+-- JSON STRING
+
 literalParser :: Parser String -- parser of type string
 literalParser = charParser '"' *> prefixParser (/= '"') <* charParser '"'
 
 jsonString :: Parser JsonValue
 jsonString = JsonString <$> literalParser
 
+-- JSON ARRAY
+
 whitespaceParser :: Parser String
 whitespaceParser = prefixParser isSpace
 
-split :: Parser Char -> Parser [JsonValue] -- this thing repeats until it fails
-split sepParser = (:) <$> jsonValue <*> many (sepParser *> jsonValue) <|> pure []
+-- split :: Parser Char -> Parser [JsonValue] -- this thing repeats until it fails
+split :: Parser a1 -> Parser a2 -> Parser [a2]
+split sepParser json = (:) <$> json <*> many (sepParser *> json) <|> pure []
+
+pluralParser :: Parser a -> Parser [a] -- plural of type, seperated by commas
+pluralParser json = split (whitespaceParser *> charParser ',' <* whitespaceParser) json
 
 jsonArray :: Parser JsonValue
 jsonArray =
   JsonArray
     <$> ( charParser '[' *> whitespaceParser
-            *> xs
+            *> pluralParser jsonValue -- plural of jsonValues
             <* whitespaceParser
             <* charParser ']'
         )
-  where
-    -- seperated by commas
-    xs = split (whitespaceParser *> charParser ',' <* whitespaceParser)
+
+-- JSON OBJECT
+
+pairParser :: Parser (String, JsonValue)
+pairParser =
+  (\key _ value -> (key, value)) <$> literalParser <*> (whitespaceParser *> charParser ':' <* whitespaceParser) <*> jsonValue
+
+jsonObject :: Parser JsonValue
+jsonObject = JsonObject <$> (charParser '{' *> whitespaceParser *> pluralParser pairParser <* whitespaceParser <* charParser '}')
 
 jsonValue :: Parser JsonValue
-jsonValue = jsonNull <|> jsonBool <|> jsonNum <|> jsonString <|> jsonArray
+jsonValue = jsonNull <|> jsonBool <|> jsonNum <|> jsonString <|> jsonArray <|> jsonObject
 
 -- parse (the thing you want to parse) (input)
 main :: IO ()

@@ -296,3 +296,13 @@ jsonArray =
 *Main Data.Char Control.Applicative> parse jsonValue "[null,null, \"bda\"]"
 Just (JsonArray [JsonNull,JsonNull,JsonString "bda"],"")
 ```
+
+Hasil akhir
+
+```
+jsonValue :: Parser JsonValue
+jsonValue = jsonNull <|> jsonBool <|> jsonNum <|> jsonString <|> jsonArray <|> jsonObject
+
+*Main Data.Char Control.Applicative> parse jsonObject "{\"hello\": [[12]], \"world\":      [ null, true]}"
+Just (JsonObject [("hello",JsonArray [JsonArray [JsonNum 12]]),("world",JsonArray [JsonNull,JsonBool True])],"")
+```
