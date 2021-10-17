@@ -85,10 +85,10 @@ jsonNum = f <$> notNull digitParser
     f x = JsonNum (read x)
 
 literalParser :: Parser String -- parser of type string
-literalParser = prefixParser (/= '"')
+literalParser = charParser '"' *> prefixParser (/= '"') <* charParser '"'
 
 jsonString :: Parser JsonValue
-jsonString = JsonString <$> (charParser '"' *> literalParser <* charParser '"')
+jsonString = JsonString <$> literalParser
 
 whitespaceParser :: Parser String
 whitespaceParser = prefixParser isSpace
