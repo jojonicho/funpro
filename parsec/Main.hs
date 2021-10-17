@@ -127,6 +127,11 @@ jsonObject = JsonObject <$> (charParser '{' *> whitespaceParser *> pluralParser 
 jsonValue :: Parser JsonValue
 jsonValue = jsonNull <|> jsonBool <|> jsonNum <|> jsonString <|> jsonArray <|> jsonObject
 
+-- parseFile "parsec/ditto.json"
+parseFile filename = do
+  inp <- readFile filename
+  return (fst <$> parse jsonValue inp)
+
 -- parse (the thing you want to parse) (input)
 main :: IO ()
 main = undefined
